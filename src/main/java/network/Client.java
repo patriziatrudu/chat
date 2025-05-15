@@ -20,7 +20,7 @@ public class Client {
         }
     }
 
-    private static InputStream is;
+    public static InputStream is;
 
     static {
         try {
@@ -30,7 +30,7 @@ public class Client {
         }
     }
 
-    private static OutputStream os;
+    public static OutputStream os;
 
     static {
         try {
@@ -40,24 +40,13 @@ public class Client {
         }
     }
 
-    private static DataInputStream dis = new DataInputStream(is);
-    private static DataOutputStream dos = new DataOutputStream(os);
-    private static BufferedReader teclado = new BufferedReader(new InputStreamReader(System.in));
-
-    public Client(String host, int port) {
-        this.HOST = host;
-        this.PORT = port;
-        try {
-
-
-        } catch (Exception e) {
-
-        }
+    public static DataInputStream dis = new DataInputStream(is);
+    public static DataOutputStream dos = new DataOutputStream(os);
+    public static BufferedReader teclado = new BufferedReader(new InputStreamReader(System.in));
+    public static void iniciarConexion() throws IOException {
 
     }
-
-
-    private static void enviarMensaje(DataOutputStream dos, Cipher cipherAESencriptar, String mensajeTexto)
+    public static void enviarMensaje(DataOutputStream dos, Cipher cipherAESencriptar, String mensajeTexto)
             throws IOException {
         try {
             byte[] mensajeCifradoTexto = cipherAESencriptar.doFinal(mensajeTexto.getBytes());
@@ -71,7 +60,7 @@ public class Client {
     }
 
 
-    private static void manejarNick(DataInputStream dis, DataOutputStream dos, BufferedReader teclado,
+    public static void manejarNick(DataInputStream dis, DataOutputStream dos, String nick,
                                     Cipher cipherAESencriptar, Cipher cipherAESdesencriptar) throws IOException {
         try {
             // Recibir el mensaje del servidor ("Introduce tu nick:")
@@ -85,7 +74,6 @@ public class Client {
 
 
             // Enviar el nick cifrado
-            String nick = teclado.readLine();
             byte[] nickCifrado = cipherAESencriptar.doFinal(nick.getBytes());
             dos.writeInt(nickCifrado.length);
             dos.write(nickCifrado);
@@ -97,7 +85,7 @@ public class Client {
     }
 
 
-    private static SecretKey establecerClaveSegura(InputStream is, OutputStream os) throws IOException {
+    public static SecretKey establecerClaveSegura(InputStream is, OutputStream os) throws IOException {
         try {
             DataInputStream dis = new DataInputStream(is);
             DataOutputStream dos = new DataOutputStream(os);

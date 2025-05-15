@@ -1,15 +1,21 @@
 package org.swing;
 
+import javax.crypto.Cipher;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
+import java.io.IOException;
+import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.List;
 
 import com.mongodb.client.FindIterable;
+import network.Client;
 import org.bson.Document;
 import org.example.MongoDBComponent;
 
@@ -24,9 +30,12 @@ public class Chat extends JFrame {
     private JTextField userField;
     private JPasswordField passwordField;
     public JPanel contentPane;
+    public SecretKey secretKey = Client.establecerClaveSegura(Client.is,Client.os);
+    public Cipher cipherAESencriptar = Cipher.getInstance("AES");
+    public Cipher cipherAESDesencriptar = Cipher.getInstance("AES");
 
     // Constructor
-    public Chat(String currentUser) {
+    public Chat(String currentUser) throws IOException, NoSuchPaddingException, NoSuchAlgorithmException {
         this.currentUser = currentUser;
         mongo = new MongoDBComponent("mongodb://localhost:27017", "Chat");
         initUI();
@@ -111,41 +120,70 @@ public class Chat extends JFrame {
         panel.add(passwordField);
 
         JButton loginButton = new JButton("Iniciar Sessió");
-        loginButton.addActionListener(e -> login());
+        loginButton.addActionListener(e -> {
+            try {
+                login();
+            } catch (IOException ex) {
+                throw new RuntimeException(ex);
+            }
+        });
         panel.add(loginButton);
 
         add(panel);
         setVisible(true);
     }
 
-    private void login() {
-        String usuari = userField.getText().trim();
-        String contrasenya = new String(passwordField.getPassword()).trim();
-        FindIterable<Document> result = mongo.findData("usuaris", new Document("nom", usuari).append("contrasenya", contrasenya));
+    private void login() throws IOException {
+        try {
+            cipherAESencriptar.init(Cipher.ENCRYPT_MODE,secretKey);
+            cipherAESDesencriptar.init(Cipher.DECRYPT_MODE,secretKey);
+            String usuari = userField.getText().trim();
+            String contrasenya = new String(passwordField.getPassword()).trim();
+            FindIterable<Document> result = mongo.findData("usuaris", new Document("nom", usuari).append("contrasenya", contrasenya));
 
-        if (result.iterator().hasNext()) {
-            dispose(); // Cierra la ventana de login
-            SwingUtilities.invokeLater(() -> new Chat(usuari)); // Abre la app de chat con el usuario logueado
-        } else {
-            JOptionPane.showMessageDialog(this, "Credencials incorrectes.", "Error", JOptionPane.ERROR_MESSAGE);
+            if (result.iterator().hasNext()) {
+                dispose(); // Cierra la ventana de login
+                SwingUtilities.invokeLater(() -> {
+                    try {
+                        new Chat(usuari);
+                    } catch (IOException | NoSuchPaddingException | NoSuchAlgorithmException e) {
+                        throw new RuntimeException(e);
+                    }
+                }); // Abre la app de chat con el usuario logueado
+            } else {
+                JOptionPane.showMessageDialog(this, "Credencials incorrectes.", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+           Client.manejarNick(Client.dis,Client.dos,usuari,cipherAESencriptar,cipherAESDesencriptar);
+        }catch (Exception e){
+
         }
+
+
+
     }
     private void enviarMensaje() {
-        String mensaje = messageField.getText().trim();
-        if (!mensaje.isEmpty()) {
-            // Crear un documento con el mensaje
-            Document mensajeDoc = new Document("text", mensaje)
-                    .append("dataHora", new Date())  // Guardamos la fecha y hora del mensaje
-                    .append("usuari", currentUser);  // Guardamos el usuario que envía el mensaje
+        try {
+            String mensaje = messageField.getText().trim();
+            if (!mensaje.isEmpty()) {
+                // Crear un documento con el mensaje
+                Document mensajeDoc = new Document("text", mensaje)
+                        .append("dataHora", new Date())  // Guardamos la fecha y hora del mensaje
+                        .append("usuari", currentUser);  // Guardamos el usuario que envía el mensaje
 
-            // Guardar el mensaje en la colección "missatges"
-            mongo.guardarMensaje(currentUser,mensaje);  // Método para guardar el mensaje
+                // Guardar el mensaje en la colección "missatges"
+                mongo.guardarMensaje(currentUser,mensaje);  // Método para guardar el mensaje
 
-            // Mostrar el mensaje en el área de chat
-            chatArea.append(currentUser + ": " + mensaje + "\n");
-            messageField.setText("");  // Limpiar el campo de entrada
-            System.out.println("Mensaje enviado");
+                // Mostrar el mensaje en el área de chat
+                chatArea.append(currentUser + ": " + mensaje + "\n");
+                messageField.setText("");  // Limpiar el campo de entrada
+                System.out.println("Mensaje enviado");
+                Client.enviarMensaje(Client.dos, cipherAESencriptar,mensaje);
+
+            }
+        } catch (RuntimeException | IOException e) {
+            throw new RuntimeException(e);
         }
+
     }
 
 
@@ -182,6 +220,12 @@ public class Chat extends JFrame {
     }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new Chat(null)); // Inicia con login
+        SwingUtilities.invokeLater(() -> {
+            try {
+                new Chat(null);
+            } catch (IOException | NoSuchPaddingException | NoSuchAlgorithmException e) {
+                throw new RuntimeException(e);
+            }
+        }); // Inicia con login
     }
 }
